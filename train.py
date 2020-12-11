@@ -6,11 +6,13 @@ import datetime
 import torch.nn as nn
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, random_split
+import torchvision.transforms.functional as tf
 from dataloader import MyDataset, getData
 from loss import LOSS, OPTIM
 from eval import feed_raw_img_unet
 from sklearn.metrics import f1_score, recall_score, confusion_matrix, accuracy_score
 from sklearn.model_selection import train_test_split
+from PIL import Image
 
 
 class Train:
@@ -78,20 +80,23 @@ class Train:
 
                     pbar.update(1)     # 每推断完1个batch进度条+1，进度条显示batch数
                     global_step += 1
-                    if global_step % args.val_batches == 0:
-                            
-                        val_score_list, _, _, _, losses, _ = self.call_val(val_loader)
+            
+            loss_record.append(np.sum(epoch_loss)/len(epoch_loss))   # 记录当前的loss
 
-                        avg_score = np.sum(val_score_list) / len(val_score_list)
-                        avg_loss = np.sum(losses) / len(losses)
+            # 每个epoch结束后进行交叉验证
+            acc_list, f1_list, recall_list, _, losses, _ = self.call_val(val_loader)
+            criterion = {'accuracy': acc_list, 'recall': recall_list, 'f1': f1_list}
+            val_score_list = criterion[args.scheduler_criterion]
 
-                        val_scores.append(avg_score)       # 记录验证的val_score
-                        loss_record.append(avg_loss)   # 记录当前的loss
-                        if args.scheduler:
-                            scheduler.step(avg_score)
+            avg_score = np.sum(val_score_list) / len(val_score_list)
+
+            val_scores.append(avg_score)       # 记录验证的val_score
+            
+            if args.scheduler:
+                scheduler.step(avg_score)
                             
             dir_checkpoint = args.model_save_path
-            if args.save and (epoch + 1) % args.save_epochs == 0:
+            if args.save and (epoch + 1) % args.save_epochs == 0:  # 保存参数
                 if not os.path.exists(dir_checkpoint):
                     os.makedirs(dir_checkpoint)
                 torch.save(self.net.state_dict(), os.path.join(dir_checkpoint, f'{args.modelName}-'+\
@@ -115,18 +120,16 @@ class Train:
             net = self.net
         net.eval()
         mask_type = torch.float32 if net.model.n_classes == 1 else torch.long
-        n_val = len(loader)  # the number of batch
 
         accs, f1s, recalls, names, losses, preds = [], [], [], [], [], []
         
         for batch in loader:
             imgs, masks_true, img_names = batch['raw_img'], batch['raw_gt'], batch['name']
-            imgs = imgs.to(device=self.device, dtype=torch.float32)
             masks_true = masks_true.to(device=self.device, dtype=mask_type)
 
             for img_index in range(imgs.shape[0]):     # 对batch内的每一张图片进行测试
-                img = imgs[img_index]
-                mask_true = masks_true[img_index] / 255
+                img = imgs[img_index]      # ndarray形式的PIL图像
+                mask_true = tf.to_tensor(Image.fromarray(masks_true[img_index]))   # mask直接转换为张量即可
                 name = img_names[img_index]
                 names.append(name)
                 
@@ -141,8 +144,8 @@ class Train:
                 f1s.append(f1_score(mask_true.view(-1).cpu(), mask_pred.view(-1)))
                 recalls.append(recall_score(mask_true.view(-1).cpu(), mask_pred.view(-1)))
 
-                prob_pred = prob_pred.squeeze(0)
-                mask_true = mask_true.squeeze(0)
+                prob_pred = prob_pred.unsqueeze(0)
+                mask_true = mask_true.unsqueeze(0)
                 losses.append(self.loss(prob_pred, mask_true.cpu()).item())
             
 

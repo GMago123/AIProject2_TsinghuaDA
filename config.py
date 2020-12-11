@@ -51,8 +51,9 @@ class Config():
             'TrainParam': {
                 'early_stop': 10,
                 'scheduler': True,
+                'scheduler_criterion': 'accuracy',
+
                 'valid' : 0.15,
-                'val_batches': 10,     # 交叉验证的间隔
 
                 'loss': 'bce',
                 'optim': 'rmsprop',

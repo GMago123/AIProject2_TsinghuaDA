@@ -47,36 +47,28 @@ class MyDataset(Dataset):
         if val:
             self.batch_size = 1
     
-    def train_transform(self, img, gt):
+    def train_transform(self, img_PIL, gt_PIL):
         """输入图像、标注图片格式转换"""
-        img = Image.fromarray(img)
-        gt = Image.fromarray(gt)
+
         if self.crop:
             i, j, h, w = transforms.RandomCrop.get_params(
-                img, output_size=(self.crop_size, self.crop_size))  # 随机裁剪
+                img_PIL, output_size=(self.crop_size, self.crop_size))  # 随机裁剪
             # print(i, j, h, w)
-            img = tf.crop(img, i, j, h, w)
-            gt = tf.crop(gt, i, j, h, w)
+            img_PIL = tf.crop(img_PIL, i, j, h, w)
+            gt_PIL = tf.crop(gt_PIL, i, j, h, w)
 
         if random.random() > 0.5:           # 随机垂直翻转
-            img = tf.hflip(img)
-            gt = tf.hflip(gt)
+            img_PIL = tf.hflip(img_PIL)
+            gt_PIL = tf.hflip(gt_PIL)
         if random.random() > 0.5:         # 随机水平翻转
-            img = tf.vflip(img)
-            gt = tf.vflip(gt)
+            img_PIL = tf.vflip(img_PIL)
+            gt_PIL = tf.vflip(gt_PIL)
         
-        origin_gt = np.asarray(gt).copy()       # 保存未经二值化的mask
+        img = tf.to_tensor(img_PIL)
+        img = utils.normalize_image(img)
+        gt = tf.to_tensor(gt_PIL)
         
-        img = np.asarray(img)/255       # 变换至0-1区间
-        img = img.transpose((2, 0, 1))       # 使原图像channel变成第一维度，并且添加三个通道
-        
-        gt = (np.asarray(gt)>0) + 0
-        
-        if len(gt.shape) == 2:
-            gt = np.expand_dims(gt, axis=2)
-        gt = gt.transpose((2, 0, 1))       # 使channel变成第一维度
-        
-        return img, gt, origin_gt
+        return img, gt
     
     @classmethod
     def center_enforce(cls, labels_mask):
@@ -106,26 +98,17 @@ class MyDataset(Dataset):
         
     
     def __getitem__(self, index):
-        raw_img = utils.load_image(self.img_files[index])
-        raw_gt = utils.load_image(self.gt_files[index])
+        raw_img_PIL = utils.load_image(self.img_files[index])
+        raw_gt_PIL = utils.load_image(self.gt_files[index])
 
-        img, mask, labels = self.train_transform(raw_img, raw_gt)
-        if self.centered:
-            mask = self.center_enforce(labels)
+        img, mask = self.train_transform(raw_img_PIL, raw_gt_PIL)
+        #if self.centered:
+        #    mask = self.center_enforce(labels)
         
-        raw_img = raw_img.transpose((2, 0, 1))     # 通道置于第一维度
-        if len(raw_gt.shape) == 2:          # 无通道时扩维
-            raw_gt = np.expand_dims(raw_gt, axis=0)
-        
-        if self.val:
-            return {'img': torch.from_numpy(img), 'gt': torch.from_numpy(mask), 
-                'labels': torch.from_numpy(labels), 
-                'raw_img': torch.from_numpy(raw_img), 'raw_gt': torch.from_numpy(raw_gt),
-                'name': self.img_files[index]}  
+        if self.val:      # 注意raw_gt是2d的；raw_img通道在最后一维(h,w,3)
+            return {'raw_img': np.array(raw_img_PIL), 'raw_gt': np.array(raw_gt_PIL), 'name': self.img_files[index]} 
         else:
-            return {'img': torch.from_numpy(img), 'gt': torch.from_numpy(mask)} 
-    
-    # 同时返回图像和二值标注、原标注，注意原标注未增加额外的通道维度
+            return {'img': img, 'gt': mask} 
 
     # 返回数据集长度
     def __len__(self):
@@ -144,31 +127,43 @@ if __name__ == "__main__":
     config = Config(args)
     args = config.get_config()
     
-    temp_loader = DataLoader(dataset=MyDataset(X_train, Y_train, args))
-    temp1, temp2, temp3 = 0, 0, 0
-    for item in temp_loader:
+    temp_loader_train = DataLoader(dataset=MyDataset(X_train, Y_train, args, val=False), shuffle=False)
+    temp_loader_val = DataLoader(dataset=MyDataset(X_train, Y_train, args, val=True), shuffle=False)
+    temp1, temp2, temp3, temp4, name = None, None, None, None, None
+    for item in temp_loader_train:
         temp1 = item['img'][0]
         temp2 = item['gt'][0]
-        temp3 = item['labels'][0]
-        temp4 = item['raw_img'][0]
-        temp5 = item['raw_gt'][0]
-        print('img shape:', temp1.shape, 'gt shape:', temp2.shape, 'labels shape:', temp3.shape,
-              'img_raw shape:', temp4.shape, 'gt_raw shape', temp5.shape)
+        print('img shape:', temp1.shape, '\ngt shape:', temp2.shape)
         break
+    for item in temp_loader_val:
+        name = item['name'][0]
+        temp3 = np.array(item['raw_img'][0])
+        temp4 = np.array(item['raw_gt'][0])
+        print('raw_img shape:', temp3.shape, '\nraw_gt shape', temp4.shape)
+        break
+
     temp1 = np.asarray(temp1[0])   # 仅取第1通道
     temp2 = np.asarray(temp2[0])   # 仅取第1通道
-    temp3 = np.asarray(temp3)
-    plt.subplot(1, 2, 1)
-    plt.imshow(temp1)
-    print('range: ', np.min(temp1), ',', np.max(temp1), 'shape: ', temp1.shape)
+    temp3 = temp3.transpose((2,0,1))[0]
 
-    plt.subplot(1, 2, 2)
+    plt.subplot(2, 2, 1)
+    plt.imshow(temp1)
+    print('img range: ', np.min(temp1), ',', np.max(temp1), 'shape: ', temp1.shape)
+
+    plt.subplot(2, 2, 2)
     plt.imshow(temp2)
-    print('range: ', np.min(temp2), ',', np.max(temp2), 'shape: ', temp2.shape)
-    print(np.unique(temp2))
+    print('gt range: ', np.min(temp2), ',', np.max(temp2), 'shape: ', temp2.shape)
+    print('labels:', np.unique(temp2))
     print('Positive propotion:', np.sum(temp2.ravel()) / (temp2.shape[0]*temp2.shape[1]))
     
-    print('range: ', np.min(temp3), ',', np.max(temp3), 'shape: ', temp3.shape)
+    plt.subplot(2, 2, 3)
+    plt.imshow(temp3)
+    print('raw_img range: ', np.min(temp3), ',', np.max(temp3), 'shape: ', temp3.shape)
 
+    plt.subplot(2, 2, 4)
+    plt.imshow(temp4)
+    print('raw_gt range: ', np.min(temp4), ',', np.max(temp4), 'shape: ', temp4.shape)
+
+    plt.title(name)
     plt.show()
     
