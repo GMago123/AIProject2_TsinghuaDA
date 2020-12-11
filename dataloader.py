@@ -105,7 +105,7 @@ class MyDataset(Dataset):
         #if self.centered:
         #    mask = self.center_enforce(labels)
         
-        if self.val:      # 注意raw_gt是2d的；raw_img通道在最后一维(h,w,3)
+        if self.val:      # 注意raw_gt是2d的；raw_img通道在最后一维(h,w,3) 类型会被强制转换为tensor
             return {'raw_img': np.array(raw_img_PIL), 'raw_gt': np.array(raw_gt_PIL), 'name': self.img_files[index]} 
         else:
             return {'img': img, 'gt': mask} 

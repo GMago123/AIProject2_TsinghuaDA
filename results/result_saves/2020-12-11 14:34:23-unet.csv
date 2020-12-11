@@ -1,0 +1,2 @@
+Model,avg-acc,avg-recall,avg-f1
+unet,"(91.69, 0.0)","(79.32, 0.0)","(74.25, 0.0)"

@@ -125,11 +125,10 @@ class Train:
         
         for batch in loader:
             imgs, masks_true, img_names = batch['raw_img'], batch['raw_gt'], batch['name']
-            masks_true = masks_true.to(device=self.device, dtype=mask_type)
 
             for img_index in range(imgs.shape[0]):     # 对batch内的每一张图片进行测试
-                img = imgs[img_index]      # ndarray形式的PIL图像
-                mask_true = tf.to_tensor(Image.fromarray(masks_true[img_index]))   # mask直接转换为张量即可
+                img = np.array(imgs[img_index])      # ndarray形式的PIL图像
+                mask_true = tf.to_tensor(Image.fromarray(np.array(masks_true[img_index])))  # mask转换为标准图像张量
                 name = img_names[img_index]
                 names.append(name)
                 
@@ -138,7 +137,7 @@ class Train:
                 
                 # print(prob_pred.shape, mask_true.shape)
                 mask_pred = (prob_pred > 0.5).float()        # mask预测结果，0.5为阈值
-                preds.append(mask_pred)
+                preds.append(prob_pred)      # 预测结果图像（Tensor形式）
 
                 accs.append(accuracy_score(mask_true.view(-1).cpu(), mask_pred.view(-1)))
                 f1s.append(f1_score(mask_true.view(-1).cpu(), mask_pred.view(-1)))
@@ -154,10 +153,21 @@ class Train:
 
 
     def result(self, net, data_dir, args):        # 计算在某指定数据集上的相关指标
+        print('Testing images in '+ data_dir)
         X, Y = getData(data_dir)
         dataset = MyDataset(X, Y, args, val=True)
         loader = DataLoader(dataset, batch_size=dataset.batch_size, shuffle=False, pin_memory=True)
         accs, f1s, recalls, names, losses, preds = self.call_val(loader, net=net)
+        
+        print('saving probability results to ' + args.res_save_path)
+        for i in range(len(names)):
+            preds_save_dir = os.path.join(args.res_save_path, 'prob_masks/')
+            if not os.path.exists(preds_save_dir):
+                os.makedirs(preds_save_dir)
+            save = os.path.join(preds_save_dir, names[i].split('/')[-1].rstrip('.png') + '_prob.png')
+            prob_img = tf.to_pil_image(preds[i])
+            prob_img.save(save)
+            
         return {'avg-acc': np.average(accs)*100, 
                 'avg-recall': np.average(recalls)*100, 
                 'avg-f1': np.average(f1s)*100}

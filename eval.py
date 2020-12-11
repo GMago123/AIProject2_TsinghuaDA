@@ -160,7 +160,7 @@ def eval(args):
                         args=args,
                         display=args.display,
                         ensemble=False)
-        cv2.imwrite(osp.join(args.res_save_path.lstrip('.png') + '_mask.png'), mask.astype(np.uint8))
+        cv2.imwrite(osp.join(args.res_save_path, fn.split('/')[-1].rstrip('.png') + '_mask.png'), mask.astype(np.uint8))
 
 
 if __name__ == "__main__":
