@@ -59,21 +59,17 @@ def run(args):
     
     # 使用并行gpu
     if args.using_cuda and len(args.gpu_ids) > 1:
-        net = torch.nn.DataParallel(net, device_ids=args.gpu_ids, output_device=args.gpu_ids[0])
+        gpu_ids = [eval(i) for i in args.gpu_ids]
+        net = torch.nn.DataParallel(net, device_ids=gpu_ids, output_device=gpu_ids[0])
     
     # 模型训练
     train_ = Train(net, args)
     train_.train_net()
     
     # 加载最近一次训练的模型进行训练集/测试集上指标的计算
-    valid_paths = []
-    for path in os.listdir(args.model_save_path):
-        affix = f'{args.modelName}-' + datetime.datetime.now().strftime('%Y-%m-%d') + '-'
-        matchObj = re.match(affix + r'epoch(\d+).pth', path)
-        if matchObj:
-            valid_paths.append((int(matchObj.group(1)), matchObj.group())) # (epoch号,文件名)
-    valid_paths = sorted(valid_paths)
-    load_model_path = os.path.join(args.model_save_path, valid_paths[-1][1])  # 序号最大的model
+    model_name = f'{args.modelName}-' + datetime.datetime.now().strftime('%Y-%m-%d')+'.pth'
+
+    load_model_path = os.path.join(args.model_save_path, model_name)  # 序号最大的model
 
     net.load_state_dict(torch.load(load_model_path))
     net.to(args.device)
@@ -130,5 +126,5 @@ def recognize(seeds=[]):       # 配置好GPU，处理args，识别程序运行�
 
 
 if __name__ == "__main__":
-    recognize(seeds=[1111])
-    # recognize(seeds=[11, 111, 1111])
+    # recognize(seeds=[1111])
+    recognize(seeds=[11, 111, 1111])

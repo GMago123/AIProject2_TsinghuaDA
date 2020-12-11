@@ -108,8 +108,8 @@ class Train:
                     os.remove(model_path)
                 torch.save(self.net.state_dict(), model_path)
             
-            if epoch - best_epoch >= args.early_stop:
-                print('Early stop at epoch:%d'.format(epoch))
+            if epoch - best_epoch >= args.early_stop:     # 经过patience个epoch后停止训练
+                print('Early stop at epoch:%d' % epoch)
                 break
         
         plt.subplots(figsize=(12, 6))
