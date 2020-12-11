@@ -103,7 +103,7 @@ def run_trains(seeds, args):
         std = round(np.std(values), 2)
         res.append((mean, std))
     for option in configs:
-        res.append(configs[option])
+        res.append(args[option])
     df.loc[len(df)] = res
 
     save_path = os.path.join(args.res_save_path, datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')\
@@ -131,4 +131,4 @@ def recognize(seeds=[]):       # 配置好GPU，处理args，识别程序运行�
 
 if __name__ == "__main__":
     recognize(seeds=[1111])
-    # run_train(seeds=[1, 11, 111, 1111, 11111])
+    # recognize(seeds=[11, 111, 1111])

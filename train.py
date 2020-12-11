@@ -108,7 +108,7 @@ class Train:
                     os.remove(model_path)
                 torch.save(self.net.state_dict(), model_path)
             
-            if epoch - best_epoch >= self.early_stop:
+            if epoch - best_epoch >= args.early_stop:
                 print('Early stop at epoch:%d'.format(epoch))
                 break
         

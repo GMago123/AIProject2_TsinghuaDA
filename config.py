@@ -61,7 +61,7 @@ class Config():
                 'lr': 0.0001,
                 'momentum': 0.9,
                 'weight_decay': 1e-8,
-                'epochs': 20,
+                'epochs': 40,
                 'save_epochs': 5,
                 'save_figure_path': './figure',         # 训练指标图像保存目录
 
