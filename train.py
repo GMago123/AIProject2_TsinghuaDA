@@ -47,6 +47,8 @@ class Train:
         val_scores = []   # 交叉验证分数记录
         loss_record = []   # 损失函数分数记录
 
+        best_epoch = 0  # 记录交叉验证分数最高的epoch
+        best_score = 0  # 记录交叉验证最高分数
         for epoch in range(args.epochs):
             self.net.train()
 
@@ -88,20 +90,27 @@ class Train:
             criterion = {'accuracy': acc_list, 'recall': recall_list, 'f1': f1_list}
             val_score_list = criterion[args.scheduler_criterion]
 
-            avg_score = np.sum(val_score_list) / len(val_score_list)
+            score = np.sum(val_score_list) / len(val_score_list)
 
-            val_scores.append(avg_score)       # 记录验证的val_score
+            val_scores.append(score)  # 记录验证的val_score，为所有图片上score的平均值
             
             if args.scheduler:
-                scheduler.step(avg_score)
-                            
-            dir_checkpoint = args.model_save_path
-            if args.save and (epoch + 1) % args.save_epochs == 0:  # 保存参数
+                scheduler.step(score)
+
+            if score > best_score:  # 保存验证分数最高的模型
+                best_score, best_epoch = score, epoch        
+                dir_checkpoint = args.model_save_path
                 if not os.path.exists(dir_checkpoint):
                     os.makedirs(dir_checkpoint)
-                torch.save(self.net.state_dict(), os.path.join(dir_checkpoint, f'{args.modelName}-'+\
-                                        datetime.datetime.now().strftime('%Y-%m-%d')+ '-'\
-                                            f'epoch{epoch + 1}.pth'))
+                model_path = os.path.join(dir_checkpoint, f'{args.modelName}-'+\
+                            datetime.datetime.now().strftime('%Y-%m-%d')+'.pth')
+                if os.path.exists(model_path):
+                    os.remove(model_path)
+                torch.save(self.net.state_dict(), model_path)
+            
+            if epoch - best_epoch >= self.early_stop:
+                print('Early stop at epoch:%d'.format(epoch))
+                break
         
         plt.subplots(figsize=(12, 6))
         plt.subplot(1,2,1)

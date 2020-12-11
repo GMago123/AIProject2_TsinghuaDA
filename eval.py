@@ -186,7 +186,7 @@ if __name__ == "__main__":
                        img_fn=img_fn,
                        device=args.device,
                        args=args,
-                       display=args.display,
+                       display=True,
                        ensemble=False)
     
     cv2.imwrite(osp.join(args.res_save_path, './../test_data/8.png'.lstrip('.png') + '_mask.png'), mask.astype(np.uint8))

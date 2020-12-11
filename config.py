@@ -49,7 +49,7 @@ class Config():
             },
 
             'TrainParam': {
-                'early_stop': 10,
+                'early_stop': 6,
                 'scheduler': True,
                 'scheduler_criterion': 'accuracy',
 

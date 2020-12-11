@@ -93,18 +93,20 @@ def run_trains(seeds, args):
         model_results.append(test_results)
 
     criterions = list(model_results[0].keys())    # 计算出的各项指标
-    df = pd.DataFrame(columns=["Model"] + criterions)
+    configs = list(args.keys())     # 配置
+    df = pd.DataFrame(columns=["Model"] + criterions + configs)
 
-    args = parse_args()
     res = [args.modelName]
     for c in criterions:
         values = [result[c] for result in model_results]
         mean = round(np.mean(values), 2)
         std = round(np.std(values), 2)
         res.append((mean, std))
+    for option in configs:
+        res.append(configs[option])
     df.loc[len(df)] = res
 
-    save_path = os.path.join(args.res_save_path, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')\
+    save_path = os.path.join(args.res_save_path, datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')\
                  + '-' + args.modelName + '.csv')
     if not os.path.exists(args.res_save_path):
         os.makedirs(args.res_save_path)
