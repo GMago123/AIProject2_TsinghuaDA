@@ -42,8 +42,10 @@ def gray_to_bgr(img):
 
 def pixel_statistics(data_dir):
     # 计算像素RGB通道均值、标准差
+    # 计算类别先验
 
     images = []
+    masks = []
     files = os.listdir(data_dir)
         
     for file in files:       # 找出图片文件
@@ -52,19 +54,39 @@ def pixel_statistics(data_dir):
             if file.find('.png') != -1:
                 image_path = os.path.join(data_dir, file)
                 images.append(image_path)
+        else:
+            if file.find('.png') != -1:
+                mask_path = os.path.join(data_dir, file)
+                masks.append(mask_path)
 
     print('原图像个数：', len(images))
 
+    images_width = []          # 图像宽度
+    images_height = []         # 图像高度
+
     pixels = []
     pixels_numpy = []
-    for img_fn in images:
+    for img_fn in images:         # 读取原图像像素
         img = Image.open(img_fn)
         assert img.mode == 'RGB', '非RGB图像' + str(img.mode)
+
+        images_width.append(img.size[0])
+        images_height.append(img.size[1])
+
         pixels_numpy.append((np.array(img)/255).reshape(-1, 3))
         img = tf.to_tensor(img)
         img = img.permute(1, 2, 0).view(-1, 3)
         
         pixels.append(img)
+    
+    samples = []            # item:[postive pixel num, total pixel num]
+    for mask_fn in masks:         # 计算mask图像正例数量
+        mask = Image.open(mask_fn)
+        assert mask.mode == 'L', '非灰度L图像' + str(mask.mode)
+        mask = np.array(mask) / 255
+        samples.append([mask.sum(), mask.shape[0]*mask.shape[1]])
+    
+    samples = np.array(samples).sum(axis=0)
 
     pixels = torch.cat(pixels)
     pixels_numpy = np.concatenate(pixels_numpy)
@@ -74,6 +96,7 @@ def pixel_statistics(data_dir):
     diff = pixels_numpy - np.array(pixels)
     print('一范数:', np.sum(np.abs(diff.ravel())))
 
+    '''
     # 针对误差画图
     numpy_mean = []
     torch_mean = []
@@ -96,9 +119,14 @@ def pixel_statistics(data_dir):
     plt.plot(x, torch_mean[:, 2], label='B_torch', color='blue')
     plt.legend()
     plt.show()
+    '''
 
     print('tensor mean: ', torch.mean(pixels, dim=0), 'ndarray mean: ', np.mean(pixels_numpy, axis=0))
     print('tensor std: ', torch.std(pixels, dim=0), 'ndarray std: ', np.std(pixels_numpy, axis=0))
+
+    print('positive class priority: ', samples[0]/samples[1], 'total num: ', samples[1])
+
+    print('图像最小宽度：', np.min(images_width), '图像最小高度：', np.min(images_height))
 
 
 

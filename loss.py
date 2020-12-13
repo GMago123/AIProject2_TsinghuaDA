@@ -7,37 +7,26 @@ OPTIM = {
     'adam': optim.Adam,
 }
 
-class BCEFocalLoss(torch.nn.Module):
+POSITIVE_PRIORITY = 0.1335         # 计算出来的正样本先验
+
+class BFocalLoss(torch.nn.Module):
     """
     二分类的Focalloss alpha:正样本损失权重占比
     """
-    def __init__(self, device=torch.device('cuda'), gamma=2, alpha=None):
+    def __init__(self, device=torch.device('cuda'), gamma=2, alpha=POSITIVE_PRIORITY):
         super().__init__()
         self.gamma = gamma
         self.alpha = alpha
         self.device = device
-    
-    @classmethod
-    def weight_pos(self, batch_gt):               # 仅返回0.5/pos 即正例权重（进行归一化）
-        assert batch_gt.shape[1] == 1        # 仅允许单通道图像
-        total = batch_gt.shape[2]*batch_gt.shape[3]
-        pos = batch_gt.view(batch_gt.shape[0],-1).sum(axis=1).float()/total
-        positive_weight = 0.5/(pos+0.0001)
-        negative_weight = 0.5/(1-pos+0.0001)
-    
-        return positive_weight / (positive_weight + negative_weight)
  
-    def forward(self, pt, target):         # input：经过softmax后的概率
+    def forward(self, input, target):         # input：经过softmax后的概率
         
         # pt = torch.sigmoid(pt)
         alpha = self.alpha
         
-        if not alpha:      # 如果没有alpha（相当于正例权重）则自行计算
-            alpha = self.weight_pos(target)
-        
         assert len(alpha)==1        # 断定batch_size=1
-        loss = - alpha * (1 - pt) ** self.gamma * target * torch.log(pt - 1e-10) - \
-               (1 - alpha) * pt ** self.gamma * (1 - target) * torch.log(1 - pt + 1e-10)
+        loss = - alpha * (1 - input) ** self.gamma * target * torch.log(input - 1e-10) - \
+               (1 - alpha) * input ** self.gamma * (1 - target) * torch.log(1 - input + 1e-10)
 
         loss = torch.mean(loss)
         # print(torch.min(pt).item(), torch.max(pt).item(), 'loss:', loss.item())
@@ -63,20 +52,27 @@ class DiceLoss(torch.nn.Module):         # Dice损失，可以改善正负样本
         return loss
 
 
-class DiceBCELoss(torch.nn.Module):
-    def __init__(self, BCEWeight):
-        super(DiceBCELoss, self).__init__()
-        self.weight = BCEWeight
-    def forward(self, pred, target):
-        dice = DiceLoss()
-        bce = torch.nn.BCELoss(weight = self.weight)
-        loss = dice(pred, target) + 1e-1*bce(pred, target)
+class IoULoss(torch.nn.Module):          # A交B/A并B
+    def __init__(self):
+        super(IoULoss, self).__init__()
+    
+    def forward(self, input, target):
+
+        inter = input * target
+        inter = inter.view(input.shape[0], input.shape[1], -1).sum(2)     # 交集大小
+
+        union = input + target - input*target
+        inter = inter.view(input.shape[0], input.shape[1], -1).sum(2)     # 并集大小
+
+        iou = inter/(union + 1e-16)     # 加入平滑因子的比值
+        loss = 1 - iou.mean()
+
         return loss
 
 
 LOSS = {
     'bce' : torch.nn.BCELoss,
-    'focal' : BCEFocalLoss,
+    'focal' : BFocalLoss,
     'dice' : DiceLoss,
-    'dicebce' : DiceBCELoss
+    'iou': IoULoss,
 }
