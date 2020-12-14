@@ -29,7 +29,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--modelName', type=str, default='unet',
                         help='support unet')
-    parser.add_argument('--loss', type=str, default='bceloss',
+    parser.add_argument('--loss', type=str, default='bce',
                         help='support bceloss, weighted bceloss')
     parser.add_argument('--pretrained_path', type=str, default=None,
                         help='path to pretrained parameters.')
@@ -87,6 +87,8 @@ def run_trains(seeds, args):
         print(args)
         test_results = run(args)
         model_results.append(test_results)
+    
+    args.seed = seeds
 
     criterions = list(model_results[0].keys())    # 计算出的各项指标
     configs = list(args.keys())     # 配置
@@ -126,5 +128,5 @@ def recognize(seeds=[]):       # 配置好GPU，处理args，识别程序运行�
 
 
 if __name__ == "__main__":
-    # recognize(seeds=[1111])
-    recognize(seeds=[1, 11, 111, 1111])
+    # recognize(seeds=[11111])
+    recognize(seeds=[1, 11, 111, 1111, 11111])

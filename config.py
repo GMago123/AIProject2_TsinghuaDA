@@ -54,15 +54,13 @@ class Config():
                 'scheduler_criterion': 'f1',
 
                 'valid' : 0.15,
-
-                'loss': 'bce',
+                
                 'optim': 'rmsprop',
 
                 'lr': 0.0001,
                 'momentum': 0.9,
                 'weight_decay': 1e-8,
                 'epochs': 40,
-                'save_epochs': 5,
                 'save_figure_path': './figure',         # 训练指标图像保存目录
 
                 'center_enforcement': False,
@@ -70,14 +68,14 @@ class Config():
             },
 
             'ProcessingParam': {
-                'display': True,
-                'BLUR_KERNEL' : 3,      # 中值模糊核大小
-                'MORPH_KERNEL' : 3,      # 腐蚀膨胀核大小
-                'MORPH_ITERATIONS' : 3,    # CLOSE操作迭代次数
-                'DIST_THRESHOLD' : 0.5,     # 寻找中心区域时，距离阈值
-                'BG_THRESHOLD' : 0.3,   # 背景区域的概率阈值
-                'FG_THRESHOLD' : 0.83,   # 前景区域的概率阈值
-                'REAL_THRESHOLD' : 0.5,  # 细胞区域概率阈值
+                'display': False,
+                'colored': False,
+                'MORPH_KERNEL' : 3,         # CLOSE操作膨胀核大小
+                'MORPH_ITERATIONS' : 3,     # CLOSE操作迭代次数
+                'DILATE_ITERATIONS': 3,     # DILATE膨胀迭代次数(获取背景)
+                'ERODE_ITERATIONS': 4,      # ERODE腐蚀迭代次数
+                'DIST_THRESHOLD' : 0.4,     # 寻找中心区域时，距离阈值
+                'REAL_THRESHOLD' : 0.5,     # 细胞区域概率阈值
             }
         }
 

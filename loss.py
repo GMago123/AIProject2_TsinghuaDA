@@ -13,7 +13,7 @@ class BFocalLoss(torch.nn.Module):
     """
     二分类的Focalloss alpha:正样本损失权重占比
     """
-    def __init__(self, device=torch.device('cuda'), gamma=2, alpha=POSITIVE_PRIORITY):
+    def __init__(self, device=torch.device('cuda'), gamma=2, alpha=0.5):
         super().__init__()
         self.gamma = gamma
         self.alpha = alpha
@@ -24,7 +24,6 @@ class BFocalLoss(torch.nn.Module):
         # pt = torch.sigmoid(pt)
         alpha = self.alpha
         
-        assert len(alpha)==1        # 断定batch_size=1
         loss = - alpha * (1 - input) ** self.gamma * target * torch.log(input - 1e-10) - \
                (1 - alpha) * input ** self.gamma * (1 - target) * torch.log(1 - input + 1e-10)
 
@@ -62,7 +61,7 @@ class IoULoss(torch.nn.Module):          # A交B/A并B
         inter = inter.view(input.shape[0], input.shape[1], -1).sum(2)     # 交集大小
 
         union = input + target - input*target
-        inter = inter.view(input.shape[0], input.shape[1], -1).sum(2)     # 并集大小
+        union = union.view(input.shape[0], input.shape[1], -1).sum(2)     # 并集大小
 
         iou = inter/(union + 1e-16)     # 加入平滑因子的比值
         loss = 1 - iou.mean()

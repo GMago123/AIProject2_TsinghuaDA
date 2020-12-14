@@ -19,41 +19,36 @@ def postprocessing(prob_mask, args, display=False):
     进行后处理（分水岭算法），计算出预测的mask，为每个细胞核用不同序号标记
     :param: prob_mask: 2d 概率图像（0-1）[h, w]
     """
-    BLUR_KERNEL = args.BLUR_KERNEL          # 中值模糊核大小
-    MORPH_KERNEL = args.MORPH_KERNEL        # 腐蚀膨胀核大小
+    MORPH_KERNEL = args.MORPH_KERNEL        # 操作核大小
     MORPH_ITERATIONS = args.MORPH_ITERATIONS    # CLOSE操作迭代次数
-    DIST_THRESHOLD = args.DIST_THRESHOLD    # 寻找中心区域时，距离阈值
-    BG_THRESHOLD = args.BG_THRESHOLD        # 背景区域的概率阈值
-    FG_THRESHOLD = args.FG_THRESHOLD        # 前景区域（细胞核心区域）的概率阈值
-    REAL_THRESHOLD = args.REAL_THRESHOLD    # 细胞区域概率阈值
+    DILATE_ITERATIONS = args.DILATE_ITERATIONS     # DILATE膨胀迭代次数
+    ERODE_ITERATIONS = args.ERODE_ITERATIONS    # ERODE腐蚀迭代次数
+    REAL_THRESHOLD = args.REAL_THRESHOLD    # 预测区域概率阈值
+    DIST_THRESHOLD = args.DIST_THRESHOLD    # 核心区域距离阈值
+    
+    kernel = np.ones((MORPH_KERNEL, MORPH_KERNEL),np.uint8)    # CLOSE核
 
-    # mask = cv2.medianBlur(mask, BLUR_KERNEL)       # 中值模糊
-    
-    kernel = np.ones((MORPH_KERNEL, MORPH_KERNEL),np.uint8)    # 核
-    # openImage = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations = MORPH_ITERATIONS)  # open操作：先腐蚀再膨胀
-    # bg = cv2.dilate(mask, kernel, iterations = 3)     # 膨胀一定程度作为背景background
-    
-    # center_mask = cv2.morphologyEx(center_mask, cv2.MORPH_CLOSE, kernel, iterations = MORPH_ITERATIONS)  # 先膨胀再腐蚀，意图消去弱连接
-    bg = np.uint8(prob_mask > BG_THRESHOLD)   # 背景区域
-    
-    fg = np.uint8(prob_mask > FG_THRESHOLD)   # 细胞置信度较大区域，前景区域
-    dist_transform = cv2.distanceTransform(fg, cv2.DIST_L2, 5)   #CV_DIST_L2（maskSize=5）的计算结果是精确的
-    ret, fg = cv2.threshold(dist_transform, DIST_THRESHOLD*dist_transform.max(), 255, 0)     # 距离变换获取中心区域，即前景foreground
-    fg = np.uint8(fg > 0)      # 前景区域
-    # fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, kernel, iterations = MORPH_ITERATIONS)  # 消除弱连接
-    
+    mask = np.uint8(prob_mask > REAL_THRESHOLD)   # 细胞区域
+    # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations = MORPH_ITERATIONS) # CLOSE
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations = MORPH_ITERATIONS) # OPEN
+
+    bg = cv2.dilate(mask, kernel, iterations=DILATE_ITERATIONS)   # 膨胀得到背景区域
+
+    fg = cv2.erode(mask, kernel, iterations=ERODE_ITERATIONS)   # 通过溶解操作获取细胞核的核心区域
+    # dist_transform = cv2.distanceTransform(mask, cv2.DIST_L2, 5)  # 通过距离预测细胞核的核心区域
+    # _, fg = cv2.threshold(dist_transform, DIST_THRESHOLD*dist_transform.max(), 1, 0)
+
+    fg = np.uint8(fg)         # [0. 1.] -> [0 1]
     unsure_area = cv2.subtract(bg, fg)        # 用bg和fg勾勒出不确定区域，值为1，其余区域为0
-    ret, fg_with_tags = cv2.connectedComponents(fg)    # 前景的相连性分析，将不同细胞核区分开来
+    num, fg_with_tags = cv2.connectedComponents(fg)    # 前景的相连性分析，将不同细胞核区分开来
+
+    # print('连通域：', np.unique(fg_with_tags))
     
     fg_with_tags += 1
     fg_with_tags[unsure_area == 1] = 0    # 不确定区域标为0. 背景加了1所以变成1
     
-    mask = np.uint8(prob_mask > REAL_THRESHOLD)   # 细胞区域
-    # print(np.max(prob_mask))
-    
     mask_with_tags = cv2.watershed(utils.gray_to_bgr(mask), fg_with_tags)   # 分水岭算法
-    mask_with_tags -= 1       # 背景为1，分界线为-1，减1加阈值，均变为0
-    mask_with_tags[mask_with_tags < 0] = 0
+    mask_with_tags[mask_with_tags < 0] = 0      # 分界线为0
     
     if display:
         plt.subplots(figsize=(16, 8))
@@ -69,10 +64,10 @@ def postprocessing(prob_mask, args, display=False):
         plt.subplot(2,2,4)
         plt.imshow(mask_with_tags)
         plt.title("Segment result")
-        print(np.unique(mask_with_tags))       # 打印输出有多少个样本
+        print(np.max(np.unique(mask_with_tags)) - 1)      # 细胞个数
         plt.show()
     
-    return mask_with_tags
+    return mask_with_tags, num-1   # 注意连通域种包括一个背景区域，减1为细胞数
 
 
 def feed_raw_img_unet(unet, raw_img, device):
@@ -122,7 +117,8 @@ def predict_img(net, img_fn, device, args, display=False, ensemble=False):
     if not ensemble:
         prob_mask = feed_raw_img_unet(net, raw_img=raw_img, device=device)
         prob_mask = prob_mask.squeeze().cpu().numpy()
-        final_mask = postprocessing(prob_mask, args, display)
+        final_mask, num = postprocessing(prob_mask, args, display)
+        raw_mask = (prob_mask > 0.5) + 0
         
     else:
         assert type(net) == list
@@ -134,33 +130,57 @@ def predict_img(net, img_fn, device, args, display=False, ensemble=False):
                 prob_mask += probs.squeeze().cpu().numpy()
                 
             prob_mask /= len(net)       # 平均数投票
+        raw_mask = (prob_mask > 0.5) + 0
         
-        
-        final_mask = postprocessing(prob_mask, args, display)
+        final_mask, num = postprocessing(prob_mask, args, display)
 
-    return final_mask
+    return raw_mask, final_mask, num
 
 
 def eval(args):
     net = Model(args.modelName, args)
 
+    args.device = 'cpu'
+
     net.to(device=args.device)
     net.load_state_dict(torch.load(args.eval, map_location=args.device))
 
-    X_test = sorted([osp.join(args.data_dir, image) for image in os.listdir(args.data_dir) if not image.find('mask.png')])
+    X_test = sorted([osp.join(args.data_dir, image) for image in os.listdir(args.data_dir) if image.find('mask.png') == -1])
     
     if not osp.exists(args.res_save_path):
         os.makedirs(args.res_save_path)
 
+    fn_with_cell_num = []
+    print("正在进行模型推断与后处理...")
     for i, fn in enumerate(X_test):
         
-        mask = predict_img(net=net,
-                        img_fn=fn,
-                        device=args.device,
-                        args=args,
-                        display=args.display,
-                        ensemble=False)
-        cv2.imwrite(osp.join(args.res_save_path, fn.split('/')[-1].rstrip('.png') + '_mask.png'), mask.astype(np.uint8))
+        raw_mask, mask, num = predict_img(net=net,
+                                          img_fn=fn,
+                                          device=args.device,
+                                          args=args,
+                                          display=args.display,
+                                          ensemble=False)
+        fn_with_cell_num.append(fn.split('/')[-1] + ', ' + str(num))      # 记录文件名+细胞核个数
+        label = np.unique(mask)
+        height, width = mask.shape[:2]
+        visual_img = np.zeros((height, width, 3))
+        for lab in label:
+            if lab == 0:
+                continue
+            color = np.random.randint(low=0, high=255, size=3)
+            visual_img[mask==lab, :] = color        
+        if args.colored:
+            cv2.imwrite(osp.join(args.res_save_path, fn.split('/')[-1].rstrip('.png') + '_colored.png'), 
+                    visual_img.astype(np.uint8))
+        else:
+            mask = raw_mask*255
+            cv2.imwrite(osp.join(args.res_save_path, 
+                    'test_' + fn.split('/')[-1].rstrip('.png') + '_pred.png'), mask.astype(np.uint8))
+    
+    with open(osp.join(args.res_save_path, 'count_result.txt'), 'w') as f:
+        for record in fn_with_cell_num:
+            f.write(record + '\n')
+    print("结果保存至" + args.res_save_path)
 
 
 if __name__ == "__main__":
@@ -171,23 +191,37 @@ if __name__ == "__main__":
     args.modelName = 'unet'
     config = Config(args)
     args = config.get_config()
-    args.modelName = 'unet'
-    args.eval = './../test_data/unet-15.pth'
+    
+    args.eval = './../result/iou64/model/unet-2020-12-14.pth'
     args.device = 'cpu'
-    args.res_save_path = './../test_data/'
+    args.res_save_path = './../result/iou64/final_data/'
 
     net = Model(args.modelName, args)
     net.to(device=args.device)
     net.load_state_dict(torch.load(args.eval, map_location=args.device))
 
-    img_fn = './../test_data/8.png'
+    img_fn = './../q2_data/test/1.png'
 
-    mask = predict_img(net=net,
+    raw_mask, mask, num = predict_img(net=net,
                        img_fn=img_fn,
                        device=args.device,
                        args=args,
                        display=True,
                        ensemble=False)
     
-    cv2.imwrite(osp.join(args.res_save_path, './../test_data/8.png'.lstrip('.png') + '_mask.png'), mask.astype(np.uint8))
+    print(num)
+
+    label = np.unique(mask)
+    height, width = mask.shape[:2]
+    visual_img = np.zeros((height, width, 3))
+    for lab in label:
+        if lab == 0:
+            continue
+        color = np.random.randint(low=0, high=255, size=3)
+        visual_img[mask==lab, :] = color
+    
+    if not osp.exists(args.res_save_path):
+        os.makedirs(args.res_save_path)
+        
+    cv2.imwrite(osp.join(args.res_save_path, '1.png'.rstrip('.png') + '_mask.png'), visual_img.astype(np.uint8))
 
