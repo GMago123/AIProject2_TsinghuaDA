@@ -43,7 +43,7 @@ class Config():
             },
 
             'DataParam' : {
-                'crop_size': 256,
+                'crop_size': 384,
                 'crop' : True,
                 'batch_size': 5,
             },
@@ -51,7 +51,7 @@ class Config():
             'TrainParam': {
                 'early_stop': 6,
                 'scheduler': True,
-                'scheduler_criterion': 'accuracy',
+                'scheduler_criterion': 'f1',
 
                 'valid' : 0.15,
 

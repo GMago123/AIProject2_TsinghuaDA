@@ -127,4 +127,4 @@ def recognize(seeds=[]):       # 配置好GPU，处理args，识别程序运行�
 
 if __name__ == "__main__":
     # recognize(seeds=[1111])
-    recognize(seeds=[11, 111, 1111])
+    recognize(seeds=[1, 11, 111, 1111])
