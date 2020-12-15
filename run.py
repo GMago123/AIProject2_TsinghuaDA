@@ -41,6 +41,8 @@ def parse_args():
                         help='path to save results.')
     parser.add_argument('--data_dir', type=str, default='./data',
                         help='path to data directory.')
+    parser.add_argument('--test_dir', type=str, default='./data',
+                        help='path to test data directory.')
     parser.add_argument('--gpu_ids', type=list, default=[0],
                         help='indicates the gpus will be used.')
     return parser.parse_args()
@@ -73,7 +75,7 @@ def run(args):
 
     net.load_state_dict(torch.load(load_model_path))
     net.to(args.device)
-    results = train_.result(net=net, data_dir=args.data_dir, args=args)  # 暂定计算训练集上的指标
+    results = train_.result(net=net, data_dir=args.test_dir, args=args)  # 暂定计算训练集上的指标
     return results
 
 def run_trains(seeds, args):
