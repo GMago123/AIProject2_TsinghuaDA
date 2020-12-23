@@ -70,8 +70,8 @@ class Config():
             'ProcessingParam': {
                 'display': False,
                 'colored': False,
-                'MORPH_KERNEL' : 3,         # CLOSE操作膨胀核大小
-                'MORPH_ITERATIONS' : 3,     # CLOSE操作迭代次数
+                'MORPH_KERNEL' : 3,         # 形态操作膨胀核大小
+                'MORPH_ITERATIONS' : 3,     # 形态操作迭代次数
                 'DILATE_ITERATIONS': 3,     # DILATE膨胀迭代次数(获取背景)
                 'ERODE_ITERATIONS': 4,      # ERODE腐蚀迭代次数
                 'DIST_THRESHOLD' : 0.4,     # 寻找中心区域时，距离阈值
