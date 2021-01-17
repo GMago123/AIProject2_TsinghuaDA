@@ -18,8 +18,6 @@ AIProject2是工程的主文件夹，代码结构化以提供一个较为通用�
 
 代码运行方式：
 
-- 训练：
-
 ```
 run.py [-h] [--modelName MODELNAME] [--loss LOSS]
               [--pretrained_path PRETRAINED_PATH]
